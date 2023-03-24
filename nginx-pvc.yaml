@@ -1,36 +1,148 @@
+---
+## yaml-language-server: $schema=https://raw.githubusercontent.com/instrumenta/kubernetes-json-schema/master/v1.14.0/pod.json
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: task-pv-pod
+#   labels:
+#     name: nginx-pvc
+# spec:
+#   volumes:
+#     - name: task-pv-storage
+#       persistentVolumeClaim:
+#         claimName: task-pv-claim
+#   containers:
+#     - name: task-pv-container
+#       image: nginx:latest
+#       imagePullPolicy: IfNotPresent
+#       ports:
+#         - containerPort: 80
+#           name: "http-server"
+#       volumeMounts:
+#         - mountPath: "/usr/share/nginx/html"
+#           name: task-pv-storage
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/instrumenta/kubernetes-json-schema/master/v1.14.0/persistentvolume.json
 apiVersion: v1
-kind: Pod
+kind: PersistentVolume
 metadata:
-  name: task-pv-pod
-  labels:
-    name: nginx-pvc
+  name: pv0001
 spec:
-  volumes:
-    - name: task-pv-storage
-      persistentVolumeClaim:
-        claimName: task-pv-claim
-  containers:
-    - name: task-pv-container
-      image: nginx:latest
-      imagePullPolicy: IfNotPresent
-      ports:
-        - containerPort: 80
-          name: "http-server"
-      volumeMounts:
-        - mountPath: "/usr/share/nginx/html"
-          name: task-pv-storage
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 5Gi
+  hostPath:
+    path: /home/tablinux/kube/pv/pv0001
 
 ---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/instrumenta/kubernetes-json-schema/master/v1.14.0/persistentvolume.json
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv0002
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 10Gi
+  hostPath:
+    path: /home/tablinux/kube/pv/pv0002
+
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/instrumenta/kubernetes-json-schema/master/v1.14.0/persistentvolume.json
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: task-pv-volume
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: "/home/tablinux/kube/pv/pv3"
+
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/instrumenta/kubernetes-json-schema/master/v1.14.0/persistentvolumeclaim.json
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: task-pv-claim
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 3Gi
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/instrumenta/kubernetes-json-schema/master/v1.14.0/deployment.json
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-deployment
+  labels:
+    app: web
+spec:
+  selector:
+    matchLabels:
+      app: web
+  replicas: 5
+  strategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      name: nginx-deployment-pod
+      labels:
+        app: web
+    spec:
+      volumes:
+      - name: task-pv-storage
+        persistentVolumeClaim:
+          claimName: task-pv-claim
+      containers:
+      - name: task-pv-container
+        image: nginx:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: "http-server"
+        volumeMounts:
+          - mountPath: "/usr/share/nginx/html"
+            name: task-pv-storage
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/instrumenta/kubernetes-json-schema/master/v1.14.0/service.json
 apiVersion: v1
 kind: Service
 metadata:
-  name: nginx-svc-pvc
+  name: nginx-service
 spec:
   selector:
-    name: nginx-pvc
+    app: web
   type: NodePort
   ports:
     - protocol: TCP
       port: 80
       targetPort: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nginx-ingress
+spec:
+  rules:
+    - http:
+        paths:
+          - pathType: Prefix
+            path: /hostname
+            backend:
+              service:
+                name: nginx-service
+                port:
+                  number: 80
 
